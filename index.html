@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <meta name="theme-color" content="#111111"/>
+  <title>Mustang Coilover Tool</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root { --pad: 14px; }
+    body { margin:0; font-family: -apple-system, system-ui, Segoe UI, Roboto, Arial, sans-serif; background:#0b0b0c; color:#f2f2f2; }
+    header { padding: var(--pad); border-bottom: 1px solid #222; position: sticky; top: 0; background:#0b0b0c; z-index: 10;}
+    header h1 { margin:0; font-size: 18px; font-weight: 700; }
+    nav { display:flex; gap:10px; margin-top:10px; flex-wrap: wrap;}
+    .tabbtn { padding:8px 10px; border:1px solid #2a2a2a; border-radius: 10px; background:#111; color:#f2f2f2; font-weight:600; }
+    .tabbtn.active { border-color:#f2f2f2; }
+    main { padding: var(--pad); max-width: 860px; margin: 0 auto; }
+    section { display:none; }
+    section.active { display:block; }
+    .card { background:#111; border:1px solid #242424; border-radius: 14px; padding: 14px; margin: 14px 0; }
+    .grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
+    .grid4 { display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:12px; }
+    label { display:block; font-size: 12px; color:#bdbdbd; margin-bottom:6px; }
+    input, select, textarea { width:100%; padding:10px; border-radius: 10px; border:1px solid #2a2a2a; background:#0b0b0c; color:#f2f2f2; font-size:16px; }
+    textarea { min-height: 70px; resize: vertical; }
+    .row { display:flex; gap:12px; flex-wrap: wrap; }
+    .row > * { flex: 1 1 180px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #222; padding: 10px 8px; text-align:left; vertical-align: top; }
+    th { font-size: 12px; color:#bdbdbd; font-weight:700; }
+    .pill { display:inline-block; padding:4px 8px; border-radius: 999px; border:1px solid #2a2a2a; font-size: 12px; }
+    .muted { color:#bdbdbd; }
+    .btn { padding:10px 12px; border:1px solid #2a2a2a; border-radius: 10px; background:#161616; color:#f2f2f2; font-weight:700; }
+    .btn.danger { border-color:#6b2a2a; }
+    .kpi { display:flex; flex-wrap: wrap; gap:10px; }
+    .kpi .pill { font-size: 13px; }
+    .small { font-size: 12px; color:#bdbdbd; }
+    @media (max-width: 520px) { .grid4 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Mustang Coilover Tool</h1>
+  <nav>
+    <button class="tabbtn active" data-tab="setup">Setup</button>
+    <button class="tabbtn" data-tab="rideheight">Ride Height</button>
+    <button class="tabbtn" data-tab="temps">Tire Temps</button>
+    <button class="tabbtn" data-tab="about">About</button>
+  </nav>
+</header>
+
+<main>
+  <section id="setup" class="active">
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Target Cross (%)</label>
+          <input id="targetCross" type="number" step="0.1" value="50">
+        </div>
+        <div>
+          <label>Adjustment Mode</label>
+          <select id="adjMode">
+            <option value="1">1 = One corner</option>
+            <option value="2">2 = Two corners (split diagonal)</option>
+          </select>
+        </div>
+      </div>
+      <div class="small" style="margin-top:10px;">
+        Clicks are 1/4 turn each. We compute exact turns, then convert to integer clicks.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 10px 0; font-size:16px;">Corner Weights (lb)</h3>
+      <div class="grid4">
+        <div><label>LF</label><input id="wLF" type="number" step="0.1" value="889"></div>
+        <div><label>RF</label><input id="wRF" type="number" step="0.1" value="816"></div>
+        <div><label>LR</label><input id="wLR" type="number" step="0.1" value="727"></div>
+        <div><label>RR</label><input id="wRR" type="number" step="0.1" value="723"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 10px 0; font-size:16px;">Coilover Specs</h3>
+      <div class="grid">
+        <div>
+          <label>Spring Rate (lb/in)</label>
+          <div class="grid4">
+            <div><label class="muted">LF</label><input id="srLF" type="number" step="1" value="650"></div>
+            <div><label class="muted">RF</label><input id="srRF" type="number" step="1" value="650"></div>
+            <div><label class="muted">LR</label><input id="srLR" type="number" step="1" value="650"></div>
+            <div><label class="muted">RR</label><input id="srRR" type="number" step="1" value="650"></div>
+          </div>
+        </div>
+        <div>
+          <label>Motion Ratio</label>
+          <div class="grid4">
+            <div><label class="muted">LF</label><input id="mrLF" type="number" step="0.01" value="1"></div>
+            <div><label class="muted">RF</label><input id="mrRF" type="number" step="0.01" value="1"></div>
+            <div><label class="muted">LR</label><input id="mrLR" type="number" step="0.01" value="1"></div>
+            <div><label class="muted">RR</label><input id="mrRR" type="number" step="0.01" value="1"></div>
+          </div>
+        </div>
+        <div>
+          <label>Threads per Inch (TPI)</label>
+          <div class="grid4">
+            <div><label class="muted">LF</label><input id="tpiLF" type="number" step="1" value="16"></div>
+            <div><label class="muted">RF</label><input id="tpiRF" type="number" step="1" value="16"></div>
+            <div><label class="muted">LR</label><input id="tpiLR" type="number" step="1" value="16"></div>
+            <div><label class="muted">RR</label><input id="tpiRR" type="number" step="1" value="16"></div>
+          </div>
+          <div class="small" style="margin-top:8px;">Per-turn weight change: SpringRate × (1/TPI) × MotionRatio².</div>
+        </div>
+        <div>
+          <label>Turns basis for clicks calc</label>
+          <select id="turnsBasis">
+            <option value="lf">Match spreadsheet (use LF per-turn)</option>
+            <option value="avg">Use average of 4 corners</option>
+          </select>
+          <div class="small" style="margin-top:8px;">Your sheet uses LF per-turn for the turns estimate.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 10px 0; font-size:16px;">Results</h3>
+      <div class="kpi" id="setupKpis"></div>
+      <div style="height:10px;"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>Corner</th>
+            <th>Action</th>
+            <th>Clicks</th>
+            <th class="muted">Notes</th>
+          </tr>
+        </thead>
+        <tbody id="adjTable"></tbody>
+      </table>
+      <div class="small" style="margin-top:10px;">
+        Cross LOW → Raise LF or RR / Lower RF or LR. Cross HIGH → Lower LF or RR / Raise RF or LR.
+      </div>
+    </div>
+
+    <div class="card">
+      <button class="btn" id="saveSetup">Save Setup to Phone</button>
+      <button class="btn danger" id="resetSetup" style="margin-left:8px;">Reset to Spreadsheet Defaults</button>
+      <div class="small" style="margin-top:10px;">Saved locally on this device (no account needed).</div>
+    </div>
+  </section>
+
+  <section id="rideheight">
+    <div class="card">
+      <h3 style="margin:0 0 10px 0; font-size:16px;">Ride Height Correlation</h3>
+      <div class="row">
+        <div><label>Threads per Inch (TPI)</label><input id="rhTpi" type="number" step="1" value="16"></div>
+        <div><label>Inches per Turn</label><input id="inPerTurn" type="number" step="0.0001" value="0.0625" readonly></div>
+        <div><label>Spring Rate (lb/in)</label><input id="rhSpring" type="number" step="1" value="650"></div>
+        <div><label>Motion Ratio</label><input id="rhMR" type="number" step="0.01" value="1"></div>
+      </div>
+      <div class="small" style="margin-top:10px;">Ride height still shows turns (continuous), since that sheet is for correlation.</div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Corner</th>
+            <th>Current RH (in)</th>
+            <th>Target RH (in)</th>
+            <th>Δ (in)</th>
+            <th>Turns</th>
+            <th>Direction</th>
+            <th>Spring comp (mm)</th>
+            <th>Predicted weight Δ (lb)</th>
+          </tr>
+        </thead>
+        <tbody id="rhTable"></tbody>
+      </table>
+      <div class="small" style="margin-top:10px;">Predicted weight change = Δ(in) × SpringRate × MotionRatio².</div>
+    </div>
+
+    <div class="card">
+      <button class="btn" id="saveRH">Save Ride Height Values</button>
+      <button class="btn danger" id="resetRH" style="margin-left:8px;">Reset RH to 26.5"</button>
+      <div class="small" style="margin-top:10px;">Saved locally on this device.</div>
+    </div>
+  </section>
+
+  <section id="temps">
+    <div class="card">
+      <h3 style="margin:0 0 10px 0; font-size:16px;">Tire Temps Log</h3>
+      <div class="grid">
+        <div><label>Date</label><input id="ttDate" type="date"></div>
+        <div><label>Track</label><input id="ttTrack" type="text" placeholder="e.g., Road Atlanta"></div>
+        <div><label>Tire</label><input id="ttTire" type="text" placeholder="e.g., FL / FR / RL / RR"></div>
+        <div><label>Notes</label><input id="ttNotes" type="text" placeholder="Session, pressure, setup notes"></div>
+      </div>
+      <div class="grid" style="margin-top:10px;">
+        <div><label>Inside Temp</label><input id="ttIn" type="number" step="0.1"></div>
+        <div><label>Middle Temp</label><input id="ttMid" type="number" step="0.1"></div>
+        <div><label>Outside Temp</label><input id="ttOut" type="number" step="0.1"></div>
+        <div>
+          <label>&nbsp;</label>
+          <button class="btn" id="addTemp">Add Entry</button>
+        </div>
+      </div>
+      <div class="small" style="margin-top:10px;">Average temp is calculated as (Inside + Middle + Outside) / 3.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <button class="btn danger" id="clearTemps">Clear All Temps</button>
+        <button class="btn" id="exportTemps">Export JSON</button>
+      </div>
+      <div class="small" style="margin-top:10px;">Export gives you a backup file you can email/text to yourself.</div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Track</th><th>Tire</th><th>In</th><th>Mid</th><th>Out</th><th>Avg</th><th>Notes</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="tempsTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="about">
+    <div class="card">
+      <h3 style="margin:0 0 10px 0; font-size:16px;">Offline phone app</h3>
+      <p class="muted" style="margin:0;">
+        This is a lightweight Progressive Web App (PWA). Once installed, it works offline and stores your values locally on your phone.
+      </p>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const num = (v) => (v === "" || v === null || v === undefined) ? 0 : Number(v);
+const round = (x, d=2) => Number.isFinite(x) ? Number(x.toFixed(d)) : 0;
+const fmt = (x, d=2) => Number.isFinite(x) ? x.toFixed(d) : "0.00";
+
+/* tabs */
+function setTab(tab){
+  document.querySelectorAll('section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tabbtn').forEach(b=>b.classList.remove('active'));
+  $(tab).classList.add('active');
+  document.querySelector(`.tabbtn[data-tab="${tab}"]`).classList.add('active');
+  localStorage.setItem('mct_lastTab', tab);
+}
+
+/* Setup */
+function computeSetup(){
+  const target = num($('targetCross').value);
+  const mode = num($('adjMode').value) || 1;
+
+  const w = {
+    LF: num($('wLF').value),
+    RF: num($('wRF').value),
+    LR: num($('wLR').value),
+    RR: num($('wRR').value),
+  };
+  const total = w.LF + w.RF + w.LR + w.RR;
+
+  const cross = total > 0 ? ((w.LF + w.RR) / total) * 100 : 0;
+  const crossError = cross - target; // positive => HIGH
+  const crossStatus = (crossError < 0) ? "LOW" : "HIGH";
+
+  const frontPct = total > 0 ? ((w.LF + w.RF)/total)*100 : 0;
+  const rearPct  = total > 0 ? ((w.LR + w.RR)/total)*100 : 0;
+
+  const perTurn = (corner) => {
+    const sr = num($('sr' + corner).value);
+    const mr = num($('mr' + corner).value);
+    const tpi = num($('tpi' + corner).value);
+    if (tpi === 0) return 0;
+    return sr * (1/tpi) * (mr*mr);
+  };
+
+  const basis = $('turnsBasis').value;
+  const perTurnBasis = (basis === 'avg')
+      ? (perTurn('LF')+perTurn('RF')+perTurn('LR')+perTurn('RR'))/4
+      : perTurn('LF');
+
+  // exact turns estimate (matches spreadsheet logic, then converted to clicks)
+  const turnsExact = (perTurnBasis > 0 && total > 0)
+      ? Math.abs(((crossError/100) * total) / (perTurnBasis * mode))
+      : 0;
+
+  // clicks: each click = 0.25 turn -> clicks = turns / 0.25 = turns * 4
+  const clicksExact = turnsExact * 4;
+
+  // since you can only do 0.25-turn increments, show integer clicks
+  // using nearest click (round). If you prefer always "up" (ceil), change here.
+  const clicks = Math.round(clicksExact);
+
+  const actions = {
+    LF: (crossError < 0) ? "RAISE" : "LOWER",
+    RF: (crossError < 0) ? "LOWER" : "RAISE",
+    LR: (crossError < 0) ? "LOWER" : "RAISE",
+    RR: (crossError < 0) ? "RAISE" : "LOWER",
+  };
+
+  $('setupKpis').innerHTML = [
+    `<span class="pill"><b>Total</b>: ${fmt(total,0)} lb</span>`,
+    `<span class="pill"><b>Cross</b>: ${fmt(cross,1)}%</span>`,
+    `<span class="pill"><b>Target</b>: ${fmt(target,1)}%</span>`,
+    `<span class="pill"><b>Cross Status</b>: ${crossStatus}</span>`,
+    `<span class="pill"><b>Error</b>: ${fmt(crossError,2)}%</span>`,
+    `<span class="pill"><b>Front</b>: ${fmt(frontPct,1)}%</span>`,
+    `<span class="pill"><b>Rear</b>: ${fmt(rearPct,1)}%</span>`,
+    `<span class="pill"><b>Clicks</b>: ${clicks} <span class="muted">(≈ ${fmt(clicks*0.25,2)} turns)</span></span>`
+  ].join("");
+
+  const corners = ["LF","RF","LR","RR"];
+  const tbody = corners.map(c=>{
+    const note = (mode===2)
+      ? "When splitting diagonal, do both corners shown in the spreadsheet pattern."
+      : "One-corner adjustment estimate.";
+    return `<tr>
+      <td><b>${c}</b></td>
+      <td>${actions[c]}</td>
+      <td><b>${clicks}</b></td>
+      <td class="muted">${note}</td>
+    </tr>`;
+  }).join("");
+  $('adjTable').innerHTML = tbody;
+}
+
+/* Ride height correlation */
+const rhCorners = ["LF","RF","LR","RR"];
+function initRideHeightTable(){
+  const saved = JSON.parse(localStorage.getItem('mct_rh') || "null");
+  const defaults = { LF:{cur:26.5, tgt:26.5}, RF:{cur:26.5, tgt:26.5}, LR:{cur:26.5, tgt:26.5}, RR:{cur:26.5, tgt:26.5} };
+  const data = saved || defaults;
+
+  $('rhTable').innerHTML = rhCorners.map(c=>{
+    return `<tr>
+      <td><b>${c}</b></td>
+      <td><input data-rh="cur" data-c="${c}" type="number" step="0.01" value="${data[c].cur}"></td>
+      <td><input data-rh="tgt" data-c="${c}" type="number" step="0.01" value="${data[c].tgt}"></td>
+      <td id="rhDelta-${c}" class="muted"></td>
+      <td id="rhTurns-${c}"></td>
+      <td id="rhDir-${c}" class="muted"></td>
+      <td id="rhMm-${c}" class="muted"></td>
+      <td id="rhW-${c}" class="muted"></td>
+    </tr>`;
+  }).join("");
+
+  document.querySelectorAll('input[data-rh]').forEach(inp=>{
+    inp.addEventListener('input', computeRideHeight);
+  });
+  computeRideHeight();
+}
+
+function computeRideHeight(){
+  const tpi = num($('rhTpi').value);
+  const inPerTurn = (tpi>0) ? (1/tpi) : 0;
+  $('inPerTurn').value = inPerTurn ? inPerTurn.toFixed(4) : "0.0000";
+  const spring = num($('rhSpring').value);
+  const mr = num($('rhMR').value);
+
+  const data = {};
+  document.querySelectorAll('input[data-rh]').forEach(inp=>{
+    const c = inp.getAttribute('data-c');
+    const kind = inp.getAttribute('data-rh');
+    data[c] = data[c] || {};
+    data[c][kind] = num(inp.value);
+  });
+
+  rhCorners.forEach(c=>{
+    const cur = data[c].cur || 0;
+    const tgt = data[c].tgt || 0;
+    const delta = tgt - cur;
+    const turns = (inPerTurn>0) ? (delta / inPerTurn) : 0;
+    const dir = (delta>0) ? "UP (raise)" : (delta<0) ? "DOWN (lower)" : "—";
+    const mm = delta * 25.4;
+    const weightDelta = delta * spring * (mr*mr);
+
+    $('rhDelta-'+c).textContent = fmt(delta,2);
+    $('rhTurns-'+c).textContent = fmt(turns,2);
+    $('rhDir-'+c).textContent = dir;
+    $('rhMm-'+c).textContent = fmt(mm,1);
+    $('rhW-'+c).textContent = fmt(weightDelta,1);
+  });
+
+  localStorage.setItem('mct_rh', JSON.stringify(data));
+}
+
+/* Tire temps */
+function loadTemps(){
+  return JSON.parse(localStorage.getItem('mct_temps') || "[]");
+}
+function saveTemps(arr){
+  localStorage.setItem('mct_temps', JSON.stringify(arr));
+}
+function renderTemps(){
+  const arr = loadTemps();
+  $('tempsTable').innerHTML = arr.map((r, idx)=>{
+    const avg = (num(r.tIn)+num(r.tMid)+num(r.tOut))/3;
+    return `<tr>
+      <td>${r.date || ""}</td>
+      <td>${r.track || ""}</td>
+      <td>${r.tire || ""}</td>
+      <td>${r.tIn ?? ""}</td>
+      <td>${r.tMid ?? ""}</td>
+      <td>${r.tOut ?? ""}</td>
+      <td>${fmt(avg,1)}</td>
+      <td class="muted">${r.notes || ""}</td>
+      <td><button class="btn danger" data-del="${idx}">Del</button></td>
+    </tr>`;
+  }).join("");
+  document.querySelectorAll('button[data-del]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const i = Number(b.getAttribute('data-del'));
+      const a = loadTemps();
+      a.splice(i,1);
+      saveTemps(a);
+      renderTemps();
+    });
+  });
+}
+
+/* persistence for setup */
+const setupKeys = ["targetCross","adjMode","wLF","wRF","wLR","wRR","srLF","srRF","srLR","srRR","mrLF","mrRF","mrLR","mrRR","tpiLF","tpiRF","tpiLR","tpiRR","turnsBasis"];
+function loadSetup(){
+  const saved = JSON.parse(localStorage.getItem('mct_setup') || "null");
+  if(!saved) return;
+  setupKeys.forEach(k=>{
+    if(saved[k] !== undefined && $(k)) $(k).value = saved[k];
+  });
+}
+function saveSetup(){
+  const obj = {};
+  setupKeys.forEach(k=>{ if($(k)) obj[k] = $(k).value; });
+  localStorage.setItem('mct_setup', JSON.stringify(obj));
+}
+function resetSetup(){
+  // spreadsheet defaults from your screenshot
+  const defaults = {
+    targetCross: 50, adjMode: 1,
+    wLF: 889, wRF: 816, wLR: 727, wRR: 723,
+    srLF:650,srRF:650,srLR:650,srRR:650,
+    mrLF:1,mrRF:1,mrLR:1,mrRR:1,
+    tpiLF:16,tpiRF:16,tpiLR:16,tpiRR:16,
+    turnsBasis:"lf"
+  };
+  Object.entries(defaults).forEach(([k,v])=>{ if($(k)) $(k).value = v; });
+  saveSetup(); computeSetup();
+}
+
+/* page init */
+document.querySelectorAll('.tabbtn').forEach(b=>{
+  b.addEventListener('click', ()=> setTab(b.getAttribute('data-tab')));
+});
+
+setupKeys.forEach(k=>{
+  if($(k)) $(k).addEventListener('input', ()=>{ computeSetup(); });
+  if($(k)) $(k).addEventListener('change', ()=>{ computeSetup(); });
+});
+
+$('saveSetup').addEventListener('click', ()=>{ saveSetup(); alert("Saved."); });
+$('resetSetup').addEventListener('click', ()=>{ resetSetup(); });
+
+$('rhTpi').addEventListener('input', computeRideHeight);
+$('rhSpring').addEventListener('input', computeRideHeight);
+$('rhMR').addEventListener('input', computeRideHeight);
+
+$('saveRH').addEventListener('click', ()=>{ alert("Ride height values are auto-saved as you type."); });
+$('resetRH').addEventListener('click', ()=>{
+  localStorage.removeItem('mct_rh');
+  initRideHeightTable();
+});
+
+$('addTemp').addEventListener('click', ()=>{
+  const rec = {
+    date: $('ttDate').value,
+    track: $('ttTrack').value,
+    tire: $('ttTire').value,
+    notes: $('ttNotes').value,
+    tIn: num($('ttIn').value),
+    tMid: num($('ttMid').value),
+    tOut: num($('ttOut').value),
+  };
+  const arr = loadTemps();
+  arr.unshift(rec);
+  saveTemps(arr);
+  renderTemps();
+  $('ttIn').value=""; $('ttMid').value=""; $('ttOut').value="";
+});
+
+$('clearTemps').addEventListener('click', ()=>{
+  if(confirm("Clear all temps?")){ saveTemps([]); renderTemps(); }
+});
+
+$('exportTemps').addEventListener('click', ()=>{
+  const data = JSON.stringify(loadTemps(), null, 2);
+  const blob = new Blob([data], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = "tire_temps_backup.json";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+(function init(){
+  const last = localStorage.getItem('mct_lastTab');
+  if(last) setTab(last);
+  // date default today
+  const today = new Date();
+  $('ttDate').value = today.toISOString().slice(0,10);
+
+  loadSetup();
+  computeSetup();
+  initRideHeightTable();
+  renderTemps();
+})();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js');
+  });
+}
+</script>
+</body>
+</html>
