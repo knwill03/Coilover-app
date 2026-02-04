@@ -14,11 +14,12 @@
     nav { display:flex; gap:10px; margin-top:10px; flex-wrap: wrap;}
     .tabbtn { padding:8px 10px; border:1px solid #2a2a2a; border-radius: 10px; background:#111; color:#f2f2f2; font-weight:600; }
     .tabbtn.active { border-color:#f2f2f2; }
-    main { padding: var(--pad); max-width: 860px; margin: 0 auto; }
+    main { padding: var(--pad); max-width: 980px; margin: 0 auto; }
     section { display:none; }
     section.active { display:block; }
     .card { background:#111; border:1px solid #242424; border-radius: 14px; padding: 14px; margin: 14px 0; }
     .grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
+    .grid3 { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
     .grid4 { display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:12px; }
     label { display:block; font-size: 12px; color:#bdbdbd; margin-bottom:6px; }
     input, select, textarea { width:100%; padding:10px; border-radius: 10px; border:1px solid #2a2a2a; background:#0b0b0c; color:#f2f2f2; font-size:16px; }
@@ -35,6 +36,9 @@
     .kpi { display:flex; flex-wrap: wrap; gap:10px; }
     .kpi .pill { font-size: 13px; }
     .small { font-size: 12px; color:#bdbdbd; }
+    .hl { font-weight: 900; }
+    .hl.soft { text-decoration: underline; }
+    .hl.stiff { text-decoration: underline; }
     @media (max-width: 520px) { .grid4 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
   </style>
 </head>
@@ -44,6 +48,7 @@
   <nav>
     <button class="tabbtn active" data-tab="setup">Setup</button>
     <button class="tabbtn" data-tab="rideheight">Ride Height</button>
+    <button class="tabbtn" data-tab="balancelog">Balance Log</button>
     <button class="tabbtn" data-tab="temps">Tire Temps</button>
     <button class="tabbtn" data-tab="about">About</button>
   </nav>
@@ -54,10 +59,27 @@
     <div class="card">
       <div class="row">
         <div>
+          <label>Adjustment Goal</label>
+          <select id="adjGoal">
+            <option value="CROSS">CROSS</option>
+            <option value="BALANCE">BALANCE</option>
+          </select>
+          <div class="small" style="margin-top:8px;">Matches the spreadsheet dropdown (CROSS / BALANCE).</div>
+        </div>
+        <div id="targetCrossWrap">
           <label>Target Cross (%)</label>
           <input id="targetCross" type="number" step="0.1" value="50">
         </div>
-        <div>
+        <div id="biasWrap" style="display:none;">
+          <label>Balance Bias</label>
+          <select id="balanceBias">
+            <option value="NEUTRAL">NEUTRAL</option>
+            <option value="MORE FRONT GRIP">MORE FRONT GRIP</option>
+            <option value="MORE REAR GRIP">MORE REAR GRIP</option>
+          </select>
+          <div class="small" style="margin-top:8px;">In BALANCE mode, we highlight soften/stiffen guidance (no ride height changes).</div>
+        </div>
+        <div id="adjModeWrap">
           <label>Adjustment Mode</label>
           <select id="adjMode">
             <option value="1">1 = One corner</option>
@@ -66,7 +88,7 @@
         </div>
       </div>
       <div class="small" style="margin-top:10px;">
-        Clicks are 1/4 turn each. We compute exact turns, then convert to integer clicks.
+        Clicks are 1/4 turn each. We compute turns, then convert to integer clicks.
       </div>
     </div>
 
@@ -80,7 +102,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="specsCard">
       <h3 style="margin:0 0 10px 0; font-size:16px;">Coilover Specs</h3>
       <div class="grid">
         <div>
@@ -117,13 +139,12 @@
             <option value="lf">Match spreadsheet (use LF per-turn)</option>
             <option value="avg">Use average of 4 corners</option>
           </select>
-          <div class="small" style="margin-top:8px;">Your sheet uses LF per-turn for the turns estimate.</div>
         </div>
       </div>
     </div>
 
-    <div class="card">
-      <h3 style="margin:0 0 10px 0; font-size:16px;">Results</h3>
+    <div class="card" id="resultsCross">
+      <h3 style="margin:0 0 10px 0; font-size:16px;">Results (Cross)</h3>
       <div class="kpi" id="setupKpis"></div>
       <div style="height:10px;"></div>
       <table>
@@ -139,6 +160,21 @@
       </table>
       <div class="small" style="margin-top:10px;">
         Cross LOW → Raise LF or RR / Lower RF or LR. Cross HIGH → Lower LF or RR / Raise RF or LR.
+      </div>
+    </div>
+
+    <div class="card" id="resultsBalance" style="display:none;">
+      <h3 style="margin:0 0 10px 0; font-size:16px;">Results (Balance)</h3>
+      <div class="kpi" id="balanceKpis"></div>
+      <div style="height:10px;"></div>
+      <table>
+        <thead>
+          <tr><th>Area</th><th>Recommendation</th></tr>
+        </thead>
+        <tbody id="balanceTable"></tbody>
+      </table>
+      <div class="small" style="margin-top:10px;">
+        BALANCE mode mirrors the spreadsheet “Balance Adjustment Guidance”, but emphasizes <span class="hl soft">SOFTEN</span>/<span class="hl stiff">STIFFEN</span> only (no ride-height suggestions).
       </div>
     </div>
 
@@ -158,7 +194,6 @@
         <div><label>Spring Rate (lb/in)</label><input id="rhSpring" type="number" step="1" value="650"></div>
         <div><label>Motion Ratio</label><input id="rhMR" type="number" step="0.01" value="1"></div>
       </div>
-      <div class="small" style="margin-top:10px;">Ride height still shows turns (continuous), since that sheet is for correlation.</div>
     </div>
 
     <div class="card">
@@ -177,13 +212,72 @@
         </thead>
         <tbody id="rhTable"></tbody>
       </table>
-      <div class="small" style="margin-top:10px;">Predicted weight change = Δ(in) × SpringRate × MotionRatio².</div>
     </div>
 
     <div class="card">
-      <button class="btn" id="saveRH">Save Ride Height Values</button>
-      <button class="btn danger" id="resetRH" style="margin-left:8px;">Reset RH to 26.5"</button>
-      <div class="small" style="margin-top:10px;">Saved locally on this device.</div>
+      <button class="btn danger" id="resetRH">Reset RH to 26.5"</button>
+      <div class="small" style="margin-top:10px;">Ride height values auto-save as you type.</div>
+    </div>
+  </section>
+
+  <section id="balancelog">
+    <div class="card">
+      <h3 style="margin:0 0 10px 0; font-size:16px;">Balance Log (matches spreadsheet headers)</h3>
+      <div class="grid">
+        <div><label>Date</label><input id="blDate" type="date"></div>
+        <div><label>Track</label><input id="blTrack" type="text" placeholder="e.g., Road Atlanta"></div>
+        <div><label>Tire Type</label><input id="blTireType" type="text" placeholder="e.g., 305 RE71RS"></div>
+        <div><label>Lap Time</label><input id="blLap" type="text" placeholder="optional"></div>
+      </div>
+      <div class="grid4" style="margin-top:10px;">
+        <div><label>LF Weight</label><input id="blLF" type="number" step="0.1"></div>
+        <div><label>RF Weight</label><input id="blRF" type="number" step="0.1"></div>
+        <div><label>RL Weight</label><input id="blRL" type="number" step="0.1"></div>
+        <div><label>RR Weight</label><input id="blRR" type="number" step="0.1"></div>
+      </div>
+      <div class="grid4" style="margin-top:10px;">
+        <div><label>RH FL</label><input id="blRHFL" type="number" step="0.01" placeholder="optional"></div>
+        <div><label>RH FR</label><input id="blRHFR" type="number" step="0.01" placeholder="optional"></div>
+        <div><label>RH RL</label><input id="blRHRL" type="number" step="0.01" placeholder="optional"></div>
+        <div><label>RH RR</label><input id="blRHRR" type="number" step="0.01" placeholder="optional"></div>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <div>
+          <label>K12 Bias</label>
+          <select id="blBias">
+            <option value="NEUTRAL">NEUTRAL</option>
+            <option value="MORE FRONT GRIP">MORE FRONT GRIP</option>
+            <option value="MORE REAR GRIP">MORE REAR GRIP</option>
+          </select>
+        </div>
+        <div style="flex: 2 1 320px;">
+          <label>Driver Notes</label>
+          <input id="blNotes" type="text" placeholder="optional">
+        </div>
+        <div style="flex: 0 0 160px;">
+          <label>&nbsp;</label>
+          <button class="btn" id="addBalanceLog">Add Entry</button>
+        </div>
+      </div>
+      <div class="small" style="margin-top:10px;">Cross %, Front %, Rear % are computed automatically from weights.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <button class="btn danger" id="clearBalanceLog">Clear Balance Log</button>
+        <button class="btn" id="exportBalanceLog">Export JSON</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Track</th><th>Tires</th><th>Cross%</th><th>Front%</th><th>Rear%</th><th>Bias</th><th>Lap</th><th>Notes</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="balanceLogTable"></tbody>
+      </table>
     </div>
   </section>
 
@@ -205,7 +299,7 @@
           <button class="btn" id="addTemp">Add Entry</button>
         </div>
       </div>
-      <div class="small" style="margin-top:10px;">Average temp is calculated as (Inside + Middle + Outside) / 3.</div>
+      <div class="small" style="margin-top:10px;">Avg = (In+Mid+Out)/3. Max = max(In,Mid,Out) (adds missing spreadsheet column).</div>
     </div>
 
     <div class="card">
@@ -213,14 +307,13 @@
         <button class="btn danger" id="clearTemps">Clear All Temps</button>
         <button class="btn" id="exportTemps">Export JSON</button>
       </div>
-      <div class="small" style="margin-top:10px;">Export gives you a backup file you can email/text to yourself.</div>
     </div>
 
     <div class="card">
       <table>
         <thead>
           <tr>
-            <th>Date</th><th>Track</th><th>Tire</th><th>In</th><th>Mid</th><th>Out</th><th>Avg</th><th>Notes</th><th></th>
+            <th>Date</th><th>Track</th><th>Tire</th><th>In</th><th>Mid</th><th>Out</th><th>Avg</th><th>Max</th><th>Notes</th><th></th>
           </tr>
         </thead>
         <tbody id="tempsTable"></tbody>
@@ -230,10 +323,14 @@
 
   <section id="about">
     <div class="card">
-      <h3 style="margin:0 0 10px 0; font-size:16px;">Offline phone app</h3>
-      <p class="muted" style="margin:0;">
-        This is a lightweight Progressive Web App (PWA). Once installed, it works offline and stores your values locally on your phone.
-      </p>
+      <h3 style="margin:0 0 10px 0; font-size:16px;">What’s included (checked against your Excel)</h3>
+      <ul class="muted" style="margin:0; padding-left:18px;">
+        <li><b>Setup</b>: Adjustment Goal (CROSS/BALANCE), Cross Status, Adjustment Mode, and Clicks output (¼ turn).</li>
+        <li><b>Balance Guidance</b>: Mirrors the spreadsheet text but emphasizes SOFTEN/STIFFEN only (per your request).</li>
+        <li><b>Ride Height Correlation</b>: Same math as the sheet.</li>
+        <li><b>Balance Log</b>: Includes all headers from the Balance Log sheet.</li>
+        <li><b>Tire Temps</b>: Includes Avg and Max temp columns (Max was missing in the first app version).</li>
+      </ul>
     </div>
   </section>
 </main>
@@ -241,10 +338,8 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const num = (v) => (v === "" || v === null || v === undefined) ? 0 : Number(v);
-const round = (x, d=2) => Number.isFinite(x) ? Number(x.toFixed(d)) : 0;
 const fmt = (x, d=2) => Number.isFinite(x) ? x.toFixed(d) : "0.00";
 
-/* tabs */
 function setTab(tab){
   document.querySelectorAll('section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.tabbtn').forEach(b=>b.classList.remove('active'));
@@ -253,107 +348,142 @@ function setTab(tab){
   localStorage.setItem('mct_lastTab', tab);
 }
 
-/* Setup */
-function computeSetup(){
-  const target = num($('targetCross').value);
-  const mode = num($('adjMode').value) || 1;
+function perTurn(corner){
+  const sr = num($('sr' + corner).value);
+  const mr = num($('mr' + corner).value);
+  const tpi = num($('tpi' + corner).value);
+  if (tpi === 0) return 0;
+  return sr * (1/tpi) * (mr*mr);
+}
 
-  const w = {
-    LF: num($('wLF').value),
-    RF: num($('wRF').value),
-    LR: num($('wLR').value),
-    RR: num($('wRR').value),
-  };
+function computeSetup(){
+  const goal = $('adjGoal').value;
+  const w = { LF:num($('wLF').value), RF:num($('wRF').value), LR:num($('wLR').value), RR:num($('wRR').value) };
   const total = w.LF + w.RF + w.LR + w.RR;
 
-  const cross = total > 0 ? ((w.LF + w.RR) / total) * 100 : 0;
-  const crossError = cross - target; // positive => HIGH
-  const crossStatus = (crossError < 0) ? "LOW" : "HIGH";
+  const cross = total>0 ? ((w.LF + w.RR)/total)*100 : 0;
+  const frontPct = total>0 ? ((w.LF + w.RF)/total)*100 : 0;
+  const rearPct  = total>0 ? ((w.LR + w.RR)/total)*100 : 0;
 
-  const frontPct = total > 0 ? ((w.LF + w.RF)/total)*100 : 0;
-  const rearPct  = total > 0 ? ((w.LR + w.RR)/total)*100 : 0;
+  if(goal === "CROSS"){
+    $('targetCrossWrap').style.display = '';
+    $('adjModeWrap').style.display = '';
+    $('biasWrap').style.display = 'none';
+    $('specsCard').style.display = '';
+    $('resultsCross').style.display = '';
+    $('resultsBalance').style.display = 'none';
 
-  const perTurn = (corner) => {
-    const sr = num($('sr' + corner).value);
-    const mr = num($('mr' + corner).value);
-    const tpi = num($('tpi' + corner).value);
-    if (tpi === 0) return 0;
-    return sr * (1/tpi) * (mr*mr);
-  };
+    const target = num($('targetCross').value);
+    const mode = num($('adjMode').value) || 1;
 
-  const basis = $('turnsBasis').value;
-  const perTurnBasis = (basis === 'avg')
+    const crossError = cross - target;
+    const crossStatus = (crossError < 0) ? "LOW" : "HIGH";
+
+    const basis = $('turnsBasis').value;
+    const perTurnBasis = (basis === 'avg')
       ? (perTurn('LF')+perTurn('RF')+perTurn('LR')+perTurn('RR'))/4
       : perTurn('LF');
 
-  // exact turns estimate (matches spreadsheet logic, then converted to clicks)
-  const turnsExact = (perTurnBasis > 0 && total > 0)
+    const turnsExact = (perTurnBasis > 0 && total > 0)
       ? Math.abs(((crossError/100) * total) / (perTurnBasis * mode))
       : 0;
 
-  // clicks: each click = 0.25 turn -> clicks = turns / 0.25 = turns * 4
-  const clicksExact = turnsExact * 4;
+    const clicks = Math.round(turnsExact * 4); // 1 click = 0.25 turn
+    const actions = {
+      LF: (crossError < 0) ? "RAISE" : "LOWER",
+      RF: (crossError < 0) ? "LOWER" : "RAISE",
+      LR: (crossError < 0) ? "LOWER" : "RAISE",
+      RR: (crossError < 0) ? "RAISE" : "LOWER",
+    };
 
-  // since you can only do 0.25-turn increments, show integer clicks
-  // using nearest click (round). If you prefer always "up" (ceil), change here.
-  const clicks = Math.round(clicksExact);
+    $('setupKpis').innerHTML = [
+      `<span class="pill"><b>Total</b>: ${fmt(total,0)} lb</span>`,
+      `<span class="pill"><b>Cross</b>: ${fmt(cross,1)}%</span>`,
+      `<span class="pill"><b>Target</b>: ${fmt(target,1)}%</span>`,
+      `<span class="pill"><b>Cross Status</b>: ${crossStatus}</span>`,
+      `<span class="pill"><b>Error</b>: ${fmt(crossError,2)}%</span>`,
+      `<span class="pill"><b>Front</b>: ${fmt(frontPct,1)}%</span>`,
+      `<span class="pill"><b>Rear</b>: ${fmt(rearPct,1)}%</span>`,
+      `<span class="pill"><b>Clicks</b>: ${clicks} <span class="muted">(≈ ${fmt(clicks*0.25,2)} turns)</span></span>`
+    ].join("");
 
-  const actions = {
-    LF: (crossError < 0) ? "RAISE" : "LOWER",
-    RF: (crossError < 0) ? "LOWER" : "RAISE",
-    LR: (crossError < 0) ? "LOWER" : "RAISE",
-    RR: (crossError < 0) ? "RAISE" : "LOWER",
-  };
-
-  $('setupKpis').innerHTML = [
-    `<span class="pill"><b>Total</b>: ${fmt(total,0)} lb</span>`,
-    `<span class="pill"><b>Cross</b>: ${fmt(cross,1)}%</span>`,
-    `<span class="pill"><b>Target</b>: ${fmt(target,1)}%</span>`,
-    `<span class="pill"><b>Cross Status</b>: ${crossStatus}</span>`,
-    `<span class="pill"><b>Error</b>: ${fmt(crossError,2)}%</span>`,
-    `<span class="pill"><b>Front</b>: ${fmt(frontPct,1)}%</span>`,
-    `<span class="pill"><b>Rear</b>: ${fmt(rearPct,1)}%</span>`,
-    `<span class="pill"><b>Clicks</b>: ${clicks} <span class="muted">(≈ ${fmt(clicks*0.25,2)} turns)</span></span>`
-  ].join("");
-
-  const corners = ["LF","RF","LR","RR"];
-  const tbody = corners.map(c=>{
     const note = (mode===2)
-      ? "When splitting diagonal, do both corners shown in the spreadsheet pattern."
-      : "One-corner adjustment estimate.";
-    return `<tr>
-      <td><b>${c}</b></td>
-      <td>${actions[c]}</td>
-      <td><b>${clicks}</b></td>
-      <td class="muted">${note}</td>
-    </tr>`;
-  }).join("");
-  $('adjTable').innerHTML = tbody;
+      ? "Mode 2: split diagonal (two corners)."
+      : "Mode 1: one-corner estimate.";
+
+    $('adjTable').innerHTML = ["LF","RF","LR","RR"].map(c=>`
+      <tr>
+        <td><b>${c}</b></td>
+        <td>${actions[c]}</td>
+        <td><b>${clicks}</b></td>
+        <td class="muted">${note}</td>
+      </tr>
+    `).join("");
+
+  } else {
+    // BALANCE
+    $('targetCrossWrap').style.display = 'none';
+    $('adjModeWrap').style.display = 'none';
+    $('biasWrap').style.display = '';
+    $('specsCard').style.display = 'none'; // not needed for balance guidance
+    $('resultsCross').style.display = 'none';
+    $('resultsBalance').style.display = '';
+
+    const bias = $('balanceBias').value;
+
+    // Mirror the spreadsheet text but emphasize soften/stiffen only (no ride height)
+    let frontRec = "NO CHANGE";
+    let rearRec = "NO CHANGE";
+
+    if(bias === "MORE FRONT GRIP"){
+      frontRec = `<span class="hl soft">SOFTEN FRONT</span>`;
+      rearRec  = `<span class="hl stiff">STIFFEN REAR</span>`;
+    } else if(bias === "MORE REAR GRIP"){
+      frontRec = `<span class="hl stiff">STIFFEN FRONT</span>`;
+      rearRec  = `<span class="hl soft">SOFTEN REAR</span>`;
+    }
+
+    $('balanceKpis').innerHTML = [
+      `<span class="pill"><b>Total</b>: ${fmt(total,0)} lb</span>`,
+      `<span class="pill"><b>Cross</b>: ${fmt(cross,1)}%</span>`,
+      `<span class="pill"><b>Front</b>: ${fmt(frontPct,1)}%</span>`,
+      `<span class="pill"><b>Rear</b>: ${fmt(rearPct,1)}%</span>`,
+      `<span class="pill"><b>Bias</b>: ${bias}</span>`
+    ].join("");
+
+    $('balanceTable').innerHTML = `
+      <tr><td><b>Front Adjustment</b></td><td>${frontRec}</td></tr>
+      <tr><td><b>Rear Adjustment</b></td><td>${rearRec}</td></tr>
+    `;
+  }
 }
 
-/* Ride height correlation */
-const rhCorners = ["LF","RF","LR","RR"];
+/* Ride height */
+const rhCorners = ["Front Left","Front Right","Rear Left","Rear Right"];
 function initRideHeightTable(){
   const saved = JSON.parse(localStorage.getItem('mct_rh') || "null");
-  const defaults = { LF:{cur:26.5, tgt:26.5}, RF:{cur:26.5, tgt:26.5}, LR:{cur:26.5, tgt:26.5}, RR:{cur:26.5, tgt:26.5} };
+  const defaults = {
+    "Front Left":{cur:26.5,tgt:26.5},
+    "Front Right":{cur:26.5,tgt:26.5},
+    "Rear Left":{cur:26.5,tgt:26.5},
+    "Rear Right":{cur:26.5,tgt:26.5},
+  };
   const data = saved || defaults;
 
-  $('rhTable').innerHTML = rhCorners.map(c=>{
-    return `<tr>
+  $('rhTable').innerHTML = rhCorners.map(c=>`
+    <tr>
       <td><b>${c}</b></td>
       <td><input data-rh="cur" data-c="${c}" type="number" step="0.01" value="${data[c].cur}"></td>
       <td><input data-rh="tgt" data-c="${c}" type="number" step="0.01" value="${data[c].tgt}"></td>
-      <td id="rhDelta-${c}" class="muted"></td>
+      <td id="rhDelta-${c}"></td>
       <td id="rhTurns-${c}"></td>
       <td id="rhDir-${c}" class="muted"></td>
       <td id="rhMm-${c}" class="muted"></td>
       <td id="rhW-${c}" class="muted"></td>
-    </tr>`;
-  }).join("");
+    </tr>
+  `).join("");
 
-  document.querySelectorAll('input[data-rh]').forEach(inp=>{
-    inp.addEventListener('input', computeRideHeight);
-  });
+  document.querySelectorAll('input[data-rh]').forEach(inp=>inp.addEventListener('input', computeRideHeight));
   computeRideHeight();
 }
 
@@ -377,8 +507,8 @@ function computeRideHeight(){
     const tgt = data[c].tgt || 0;
     const delta = tgt - cur;
     const turns = (inPerTurn>0) ? (delta / inPerTurn) : 0;
-    const dir = (delta>0) ? "UP (raise)" : (delta<0) ? "DOWN (lower)" : "—";
-    const mm = delta * 25.4;
+    const dir = (turns>0) ? "RAISE" : (turns<0) ? "LOWER" : "NO CHANGE";
+    const mm = turns * inPerTurn * 25.4; // = delta * 25.4
     const weightDelta = delta * spring * (mr*mr);
 
     $('rhDelta-'+c).textContent = fmt(delta,2);
@@ -391,17 +521,54 @@ function computeRideHeight(){
   localStorage.setItem('mct_rh', JSON.stringify(data));
 }
 
+/* Balance log */
+function loadBalanceLog(){ return JSON.parse(localStorage.getItem('mct_balanceLog') || "[]"); }
+function saveBalanceLog(arr){ localStorage.setItem('mct_balanceLog', JSON.stringify(arr)); }
+
+function computePercents(lf, rf, rl, rr){
+  const total = lf+rf+rl+rr;
+  const cross = total>0 ? ((lf+rr)/total)*100 : 0;
+  const front = total>0 ? ((lf+rf)/total)*100 : 0;
+  const rear  = total>0 ? ((rl+rr)/total)*100 : 0;
+  return {total, cross, front, rear};
+}
+
+function renderBalanceLog(){
+  const arr = loadBalanceLog();
+  $('balanceLogTable').innerHTML = arr.map((r, idx)=>`
+    <tr>
+      <td>${r.date||""}</td>
+      <td>${r.track||""}</td>
+      <td>${r.tireType||""}</td>
+      <td>${fmt(r.cross,1)}</td>
+      <td>${fmt(r.front,1)}</td>
+      <td>${fmt(r.rear,1)}</td>
+      <td>${r.bias||""}</td>
+      <td>${r.lap||""}</td>
+      <td class="muted">${r.notes||""}</td>
+      <td><button class="btn danger" data-bldel="${idx}">Del</button></td>
+    </tr>
+  `).join("");
+
+  document.querySelectorAll('button[data-bldel]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const i = Number(b.getAttribute('data-bldel'));
+      const a = loadBalanceLog();
+      a.splice(i,1);
+      saveBalanceLog(a);
+      renderBalanceLog();
+    });
+  });
+}
+
 /* Tire temps */
-function loadTemps(){
-  return JSON.parse(localStorage.getItem('mct_temps') || "[]");
-}
-function saveTemps(arr){
-  localStorage.setItem('mct_temps', JSON.stringify(arr));
-}
+function loadTemps(){ return JSON.parse(localStorage.getItem('mct_temps') || "[]"); }
+function saveTemps(arr){ localStorage.setItem('mct_temps', JSON.stringify(arr)); }
 function renderTemps(){
   const arr = loadTemps();
   $('tempsTable').innerHTML = arr.map((r, idx)=>{
     const avg = (num(r.tIn)+num(r.tMid)+num(r.tOut))/3;
+    const mx = Math.max(num(r.tIn),num(r.tMid),num(r.tOut));
     return `<tr>
       <td>${r.date || ""}</td>
       <td>${r.track || ""}</td>
@@ -410,10 +577,12 @@ function renderTemps(){
       <td>${r.tMid ?? ""}</td>
       <td>${r.tOut ?? ""}</td>
       <td>${fmt(avg,1)}</td>
+      <td>${fmt(mx,1)}</td>
       <td class="muted">${r.notes || ""}</td>
       <td><button class="btn danger" data-del="${idx}">Del</button></td>
     </tr>`;
   }).join("");
+
   document.querySelectorAll('button[data-del]').forEach(b=>{
     b.addEventListener('click', ()=>{
       const i = Number(b.getAttribute('data-del'));
@@ -425,14 +594,12 @@ function renderTemps(){
   });
 }
 
-/* persistence for setup */
-const setupKeys = ["targetCross","adjMode","wLF","wRF","wLR","wRR","srLF","srRF","srLR","srRR","mrLF","mrRF","mrLR","mrRR","tpiLF","tpiRF","tpiLR","tpiRR","turnsBasis"];
+/* persistence */
+const setupKeys = ["adjGoal","targetCross","adjMode","balanceBias","wLF","wRF","wLR","wRR","srLF","srRF","srLR","srRR","mrLF","mrRF","mrLR","mrRR","tpiLF","tpiRF","tpiLR","tpiRR","turnsBasis"];
 function loadSetup(){
   const saved = JSON.parse(localStorage.getItem('mct_setup') || "null");
   if(!saved) return;
-  setupKeys.forEach(k=>{
-    if(saved[k] !== undefined && $(k)) $(k).value = saved[k];
-  });
+  setupKeys.forEach(k=>{ if(saved[k] !== undefined && $(k)) $(k).value = saved[k]; });
 }
 function saveSetup(){
   const obj = {};
@@ -440,8 +607,9 @@ function saveSetup(){
   localStorage.setItem('mct_setup', JSON.stringify(obj));
 }
 function resetSetup(){
-  // spreadsheet defaults from your screenshot
   const defaults = {
+    adjGoal:"CROSS",
+    balanceBias:"NEUTRAL",
     targetCross: 50, adjMode: 1,
     wLF: 889, wRF: 816, wLR: 727, wRR: 723,
     srLF:650,srRF:650,srLR:650,srRR:650,
@@ -453,14 +621,11 @@ function resetSetup(){
   saveSetup(); computeSetup();
 }
 
-/* page init */
-document.querySelectorAll('.tabbtn').forEach(b=>{
-  b.addEventListener('click', ()=> setTab(b.getAttribute('data-tab')));
-});
-
+/* init */
+document.querySelectorAll('.tabbtn').forEach(b=>b.addEventListener('click', ()=> setTab(b.getAttribute('data-tab'))));
 setupKeys.forEach(k=>{
-  if($(k)) $(k).addEventListener('input', ()=>{ computeSetup(); });
-  if($(k)) $(k).addEventListener('change', ()=>{ computeSetup(); });
+  if($(k)) $(k).addEventListener('input', ()=>{ computeSetup(); saveSetup(); });
+  if($(k)) $(k).addEventListener('change', ()=>{ computeSetup(); saveSetup(); });
 });
 
 $('saveSetup').addEventListener('click', ()=>{ saveSetup(); alert("Saved."); });
@@ -469,11 +634,43 @@ $('resetSetup').addEventListener('click', ()=>{ resetSetup(); });
 $('rhTpi').addEventListener('input', computeRideHeight);
 $('rhSpring').addEventListener('input', computeRideHeight);
 $('rhMR').addEventListener('input', computeRideHeight);
-
-$('saveRH').addEventListener('click', ()=>{ alert("Ride height values are auto-saved as you type."); });
 $('resetRH').addEventListener('click', ()=>{
   localStorage.removeItem('mct_rh');
   initRideHeightTable();
+});
+
+$('addBalanceLog').addEventListener('click', ()=>{
+  const lf = num($('blLF').value), rf = num($('blRF').value), rl = num($('blRL').value), rr = num($('blRR').value);
+  const p = computePercents(lf,rf,rl,rr);
+  const rec = {
+    date: $('blDate').value,
+    track: $('blTrack').value,
+    tireType: $('blTireType').value,
+    lf, rf, rl, rr,
+    cross: p.cross, front: p.front, rear: p.rear,
+    rhFL: num($('blRHFL').value), rhFR: num($('blRHFR').value), rhRL: num($('blRHRL').value), rhRR: num($('blRHRR').value),
+    bias: $('blBias').value,
+    notes: $('blNotes').value,
+    lap: $('blLap').value
+  };
+  const arr = loadBalanceLog();
+  arr.unshift(rec);
+  saveBalanceLog(arr);
+  renderBalanceLog();
+});
+
+$('clearBalanceLog').addEventListener('click', ()=>{
+  if(confirm("Clear all balance log entries?")){ saveBalanceLog([]); renderBalanceLog(); }
+});
+$('exportBalanceLog').addEventListener('click', ()=>{
+  const data = JSON.stringify(loadBalanceLog(), null, 2);
+  const blob = new Blob([data], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = "balance_log_backup.json";
+  a.click();
+  URL.revokeObjectURL(url);
 });
 
 $('addTemp').addEventListener('click', ()=>{
@@ -496,7 +693,6 @@ $('addTemp').addEventListener('click', ()=>{
 $('clearTemps').addEventListener('click', ()=>{
   if(confirm("Clear all temps?")){ saveTemps([]); renderTemps(); }
 });
-
 $('exportTemps').addEventListener('click', ()=>{
   const data = JSON.stringify(loadTemps(), null, 2);
   const blob = new Blob([data], {type:"application/json"});
@@ -511,13 +707,14 @@ $('exportTemps').addEventListener('click', ()=>{
 (function init(){
   const last = localStorage.getItem('mct_lastTab');
   if(last) setTab(last);
-  // date default today
-  const today = new Date();
-  $('ttDate').value = today.toISOString().slice(0,10);
+  const today = new Date().toISOString().slice(0,10);
+  $('ttDate').value = today;
+  $('blDate').value = today;
 
   loadSetup();
   computeSetup();
   initRideHeightTable();
+  renderBalanceLog();
   renderTemps();
 })();
 </script>
